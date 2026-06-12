@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thoughts</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #fafaf8;
+      --text: #1a1a1a;
+      --muted: #888;
+      --border: #e8e8e4;
+      --accent: #1a1a1a;
+      --max: 680px;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Georgia', serif;
+      font-size: 18px;
+      line-height: 1.75;
+      padding: 80px 24px 120px;
+    }
+
+    header {
+      max-width: var(--max);
+      margin: 0 auto 72px;
+    }
+
+    header h1 {
+      font-size: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    header p {
+      margin-top: 12px;
+      font-size: 15px;
+      color: var(--muted);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    #thoughts {
+      max-width: var(--max);
+      margin: 0 auto;
+    }
+
+    .thought {
+      padding-bottom: 56px;
+      margin-bottom: 56px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .thought:last-child {
+      border-bottom: none;
+    }
+
+    .thought-meta {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 14px;
+      letter-spacing: 0.02em;
+    }
+
+    .thought-title {
+      font-size: 22px;
+      font-weight: normal;
+      line-height: 1.4;
+      margin-bottom: 16px;
+      letter-spacing: -0.01em;
+    }
+
+    .thought-body {
+      font-size: 17px;
+      color: #333;
+      white-space: pre-wrap;
+    }
+
+    /* States */
+    .state {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 15px;
+      color: var(--muted);
+      text-align: center;
+      padding: 80px 0;
+    }
+
+    .loader {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .loader span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    .loader span:nth-child(2) { animation-delay: 0.2s; }
+    .loader span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes pulse {
+      0%, 80%, 100% { opacity: 0.2; transform: scale(0.8); }
+      40% { opacity: 1; transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Thoughts</h1>
+    <p>Notes on things I'm thinking about.</p>
+  </header>
+
+  <div id="thoughts">
+    <div class="state">
+      <div class="loader">
+        <span></span><span></span><span></span>
+      </div>
+      Loading thoughts...
+    </div>
+  </div>
+
+  <script>
+    const container = document.getElementById('thoughts');
+
+    function formatDate(str) {
+      const d = new Date(str + 'T00:00:00');
+      return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    }
+
+    async function loadThoughts() {
+      try {
+        const res = await fetch('/api/notion');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const { thoughts } = await res.json();
+
+        if (!thoughts || thoughts.length === 0) {
+          container.innerHTML = '<div class="state">Nothing here yet.</div>';
+          return;
+        }
+
+        container.innerHTML = thoughts.map(t => `
+          <article class="thought">
+            <div class="thought-meta">${formatDate(t.date)}</div>
+            ${t.title ? `<h2 class="thought-title">${escapeHtml(t.title)}</h2>` : ''}
+            ${t.body ? `<p class="thought-body">${escapeHtml(t.body)}</p>` : ''}
+          </article>
+        `).join('');
+
+      } catch (err) {
+        container.innerHTML = `<div class="state">Couldn't load thoughts.<br><small>${err.message}</small></div>`;
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    loadThoughts();
+  </script>
+
+</body>
+</html>
