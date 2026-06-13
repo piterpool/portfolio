@@ -1,11 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ROFLS</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Places I've Visited — Saidbek's World</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root{
+    --gold:#c9a84c;
+    --gold-bright:#f0d27a;
+    --green:#19d483;
+    --bg:#000;
+  }
+  html, body { margin:0; padding:0; height:100%; background:var(--bg); font-family:'Poppins',Georgia,serif; }
+  #map { width:100vw; height:100vh; background:var(--bg); }
+
+  /* ---- top title bar ---- */
+  .topbar{
+    position:fixed; top:0; left:0; right:0; z-index:1000;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 18px;
+    background:linear-gradient(180deg, rgba(0,0,0,0.85), rgba(0,0,0,0));
+    pointer-events:none;
+  }
+  .topbar a{ pointer-events:auto; }
+  .title{ color:var(--gold-bright); font-size:1.05rem; font-weight:700; letter-spacing:1px; text-shadow:0 1px 6px #000; }
+  .title small{ display:block; color:#9a8f6f; font-size:0.66rem; font-weight:400; letter-spacing:0.5px; }
+  .back-link{ color:#bdbdbd; text-decoration:none; font-size:0.8rem; background:rgba(0,0,0,0.5); border:1px solid #333; padding:6px 12px; border-radius:20px; transition:.25s; }
+  .back-link:hover{ color:var(--green); border-color:var(--green); }
+
+  /* ---- stats + legend panel ---- */
+  .panel{
+    position:fixed; left:18px; bottom:22px; z-index:1000;
+    background:rgba(10,10,10,0.82); backdrop-filter:blur(6px);
+    border:1px solid #2b2b2b; border-radius:12px;
+    padding:14px 16px; min-width:170px;
+    box-shadow:0 6px 26px rgba(0,0,0,0.6);
+    font-family:'Poppins',sans-serif;
+  }
+  .stat-row{ display:flex; align-items:baseline; gap:8px; margin-bottom:8px; }
+  .stat-num{ color:var(--gold-bright); font-size:1.5rem; font-weight:700; line-height:1; }
+  .stat-lbl{ color:#9a9a9a; font-size:0.72rem; text-transform:uppercase; letter-spacing:1px; }
+  .legend{ border-top:1px solid #2b2b2b; margin-top:6px; padding-top:10px; }
+  .legend-item{ display:flex; align-items:center; gap:9px; margin:6px 0; color:#d8d8d8; font-size:0.78rem; }
+  .swatch-mosque{ width:18px; height:18px; flex:0 0 18px; }
+  .swatch-place{ width:14px; height:14px; flex:0 0 14px; border-radius:50%; background:var(--green); border:2px solid #0a3; box-shadow:0 0 8px rgba(25,212,131,0.7); }
+
+  /* ---- custom mosque marker ---- */
+  .mosque-marker{ filter:drop-shadow(0 0 6px rgba(201,168,76,0.85)); }
+  .place-marker{
+    width:14px; height:14px; border-radius:50%;
+    background:var(--green); border:2px solid #0a3;
+    box-shadow:0 0 8px rgba(25,212,131,0.8);
+  }
+
+  /* ---- popups ---- */
+  .leaflet-popup-content-wrapper{
+    background:#0c0c0c; color:#eee;
+    border:1px solid var(--gold); border-radius:10px;
+    box-shadow:0 6px 26px rgba(0,0,0,0.7);
+    font-family:Georgia, serif;
+  }
+  .leaflet-popup-tip{ background:#0c0c0c; border:1px solid var(--gold); }
+  .leaflet-popup-content{ margin:12px 16px; min-width:180px; }
+  .leaflet-popup-close-button{ color:#777 !important; }
+  .popup-name{ font-size:1.02rem; font-weight:bold; color:var(--gold-bright); margin-bottom:5px; }
+  .popup-badge{ display:inline-block; font-size:0.62rem; letter-spacing:1px; text-transform:uppercase; color:#000; background:var(--gold); padding:2px 7px; border-radius:10px; margin-bottom:7px; }
+  .popup-row{ font-size:0.8rem; color:#bbb; margin:3px 0; }
+  .popup-row b{ color:#f0e6c8; font-weight:600; }
+  .popup-note{ font-size:0.76rem; color:#9d9d9d; font-style:italic; margin-top:8px; border-top:1px solid #2a2a2a; padding-top:6px; }
+
+  /* ---- loading / error toast ---- */
+  .toast{
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1100;
+    background:rgba(12,12,12,0.95); color:#ddd; border:1px solid #333;
+    padding:18px 26px; border-radius:12px; font-family:'Poppins',sans-serif; font-size:0.9rem;
+    text-align:center; max-width:340px; box-shadow:0 6px 30px rgba(0,0,0,0.7);
+  }
+  .toast b{ color:var(--gold-bright); }
+  .toast.err{ border-color:#a33; }
+  .spinner{ width:22px; height:22px; border:3px solid #333; border-top-color:var(--gold); border-radius:50%; margin:0 auto 10px; animation:spin 0.9s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  @import url('https://fonts.googleapis.com/css?family=Poppins:400,500,600,700&display=swap');
+</style>
 </head>
 <body>
-    
+<div class="topbar">
+  <div class="title">PLACES I'VE VISITED<small>Mosques marked in gold · live from my travel log</small></div>
+  <a class="back-link" href="index.html">← Saidbek's World</a>
+</div>
+
+<div id="map"></div>
+
+<div class="panel" id="panel" style="display:none;">
+  <div class="stat-row"><span class="stat-num" id="count-total">0</span><span class="stat-lbl">places visited</span></div>
+  <div class="stat-row"><span class="stat-num" id="count-mosque" style="color:var(--gold);">0</span><span class="stat-lbl">mosques</span></div>
+  <div class="legend">
+    <div class="legend-item">
+      <svg class="swatch-mosque" viewBox="0 0 24 24" fill="#c9a84c"><path d="M12 2c-1.6 1.6-2.6 3-2.6 4.3 0 1 .7 1.8 1.4 2.5H8.2C6.4 9.7 5 11.2 5 13v1h14v-1c0-1.8-1.4-3.3-3.2-4.2h-2.6c.7-.7 1.4-1.5 1.4-2.5C14.6 5 13.6 3.6 12 2zM5 15v6h3v-3a4 4 0 018 0v3h3v-6H5z"/></svg>
+      <span>Mosque visited</span>
+    </div>
+    <div class="legend-item"><span class="swatch-place"></span><span>Place visited</span></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><div class="spinner"></div>Loading your travel log…</div>
+
+<script>
+// ============================================================
+//  STEP 1: Publish your Google Sheet  (File ▸ Share ▸ Publish to web ▸ CSV)
+//  STEP 2: Paste that link between the quotes below.
+//  Header names matter, not their order. Recognised columns:
+//     name | city | country | lat | lng | built | visited | category | note
+//  To mark a mosque: type "mosque" in the category column (or add a "mosque" column with "yes").
+// ============================================================
+const CSV_URL = "https://docs.google.com/spreadsheets/d/13iVEv8UijY5aK8RpRMctAjJX1UBmvOCXI_jL-p2C10Q/gviz/tq?tqx=out:csv&gid=436474453";
+// ============================================================
+
+const map = L.map("map", { zoomControl:true, worldCopyJump:true }).setView([25, 20], 2);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  attribution:"© OpenStreetMap © CartoDB", maxZoom:19, subdomains:"abcd"
+}).addTo(map);
+
+const mosqueIcon = L.divIcon({
+  className:"mosque-marker",
+  html:`<svg width="30" height="30" viewBox="0 0 24 24" fill="#c9a84c" stroke="#1a1a1a" stroke-width="0.4">
+          <path d="M12 2c-1.6 1.6-2.6 3-2.6 4.3 0 1 .7 1.8 1.4 2.5H8.2C6.4 9.7 5 11.2 5 13v1h14v-1c0-1.8-1.4-3.3-3.2-4.2h-2.6c.7-.7 1.4-1.5 1.4-2.5C14.6 5 13.6 3.6 12 2zM5 15v6h3v-3a4 4 0 018 0v3h3v-6H5z"/>
+        </svg>`,
+  iconSize:[30,30], iconAnchor:[15,28], popupAnchor:[0,-26]
+});
+const placeIcon = L.divIcon({ className:"", html:`<div class="place-marker"></div>`, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-8] });
+
+const toast = document.getElementById("toast");
+// A row is a mosque if the "mosque" column says yes  OR  the "category" column contains "mosque"
+const isMosque = p =>
+  /^(yes|y|true|1|x|✓)$/i.test((p.mosque||"").trim()) ||
+  /mosque/i.test(p.category||"") ||
+  /mosque/i.test(p.type||"");
+
+// CSV parser that handles quoted fields and commas/newlines inside quotes
+function parseCSV(text){
+  const rows=[]; let row=[], cur="", inQ=false;
+  text = text.replace(/\r\n/g,"\n").replace(/\r/g,"\n");
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){
+      if(c==='"'){ if(text[i+1]==='"'){cur+='"';i++;} else inQ=false; }
+      else cur+=c;
+    } else {
+      if(c==='"') inQ=true;
+      else if(c===','){ row.push(cur); cur=""; }
+      else if(c==='\n'){ row.push(cur); rows.push(row); row=[]; cur=""; }
+      else cur+=c;
+    }
+  }
+  if(cur!==""||row.length){ row.push(cur); rows.push(row); }
+  const headers = rows.shift().map(h=>h.trim().toLowerCase());
+  return rows.map(r=>{
+    const o={}; headers.forEach((h,i)=>o[h]=(r[i]||"").trim()); return o;
+  }).filter(r=>r.lat && r.lng && !isNaN(parseFloat(r.lat)));
+}
+
+async function fetchCSV(url){
+  // Google's /pub endpoint rejects unknown query params (400), so DON'T add a cache-buster to it.
+  // Safari blocks Google's cross-origin CSV redirect, so try direct first, then CORS proxies.
+  const routes = [
+    url,
+    "https://api.allorigins.win/raw?url=" + encodeURIComponent(url),
+    "https://corsproxy.io/?url=" + encodeURIComponent(url),
+    "https://api.codetabs.com/v1/proxy/?quest=" + encodeURIComponent(url),
+    "https://thingproxy.freeboard.io/fetch/" + url
+  ];
+  // also try allorigins JSON endpoint, which reliably follows Google's redirect
+  routes.push("https://api.allorigins.win/get?url=" + encodeURIComponent(url));
+  let lastErr;
+  for(const r of routes){
+    try{
+      const res = await fetch(r, { redirect:"follow", cache:"no-store" });
+      if(!res.ok) { lastErr = new Error("HTTP "+res.status); continue; }
+      let text = await res.text();
+      if(r.includes("/get?url=")){ try{ text = JSON.parse(text).contents; }catch(e){} }
+      if(text && text.includes(",") && !/<html/i.test(text)) return text; // looks like CSV, not an error page
+      lastErr = new Error("non-CSV response");
+    }catch(e){ lastErr = e; }
+  }
+  throw lastErr || new Error("all routes failed");
+}
+
+async function load(){
+  if(CSV_URL.includes("PASTE_YOUR")){
+    toast.className="toast err";
+    toast.innerHTML=`<b>Almost there!</b><br>Open <b>travel.html</b> and paste your published Google&nbsp;Sheet CSV link into <b>CSV_URL</b> (line&nbsp;~140).`;
+    return;
+  }
+  try{
+    const text = await fetchCSV(CSV_URL);
+    const places = parseCSV(text);
+    if(!places.length) throw new Error("no rows");
+
+    const group=[]; let mosques=0;
+    places.forEach(p=>{
+      const lat=parseFloat(p.lat), lng=parseFloat(p.lng);
+      if(isNaN(lat)||isNaN(lng)) return;
+      const mosque=isMosque(p);
+      if(mosque) mosques++;
+      const m=L.marker([lat,lng],{ icon: mosque?mosqueIcon:placeIcon, riseOnHover:true }).addTo(map);
+      const loc=[p.city,p.country].filter(Boolean).join(", ");
+      m.bindPopup(`
+        ${mosque?'<div class="popup-badge">Mosque</div>':''}
+        <div class="popup-name">${p.name||"Unnamed"}</div>
+        ${loc?`<div class="popup-row">${loc}</div>`:""}
+        ${p.built?`<div class="popup-row">Built: <b>${p.built}</b></div>`:""}
+        ${p.visited?`<div class="popup-row">Visited: <b>${p.visited}</b></div>`:""}
+        ${(p.category && !/mosque/i.test(p.category))?`<div class="popup-row">${p.category}</div>`:""}
+        ${p.note?`<div class="popup-note">${p.note}</div>`:""}
+      `);
+      group.push([lat,lng]);
+    });
+
+    document.getElementById("count-total").textContent=group.length;
+    document.getElementById("count-mosque").textContent=mosques;
+    document.getElementById("panel").style.display="block";
+    if(group.length) map.fitBounds(group,{ padding:[60,60], maxZoom:6 });
+    toast.style.display="none";
+  }catch(e){
+    toast.className="toast err";
+    toast.innerHTML=`<b>Couldn't load the sheet.</b><br>Check that it's <b>published to web as CSV</b> and the link is correct.<br><small style="color:#777">${e.message||e}</small>`;
+  }
+}
+load();
+</script>
 </body>
 </html>
