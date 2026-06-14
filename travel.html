@@ -131,10 +131,11 @@
 const CSV_URL = "https://docs.google.com/spreadsheets/d/13iVEv8UijY5aK8RpRMctAjJX1UBmvOCXI_jL-p2C10Q/gviz/tq?tqx=out:csv&gid=436474453";
 // ============================================================
 
-const map = L.map("map", { zoomControl:true, worldCopyJump:true }).setView([25, 20], 2);
+const map = L.map("map", { zoomControl:false, worldCopyJump:true }).setView([25, 20], 2);
 L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
   attribution:"© OpenStreetMap © CartoDB", maxZoom:19, subdomains:"abcd"
 }).addTo(map);
+L.control.zoom({ position:"bottomright" }).addTo(map);   // keep zoom buttons clear of the title
 
 const mosqueIcon = L.divIcon({
   className:"mosque-marker",
