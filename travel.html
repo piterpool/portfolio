@@ -63,8 +63,20 @@
     font-family:Georgia, serif;
   }
   .leaflet-popup-tip{ background:#0c0c0c; border:1px solid var(--gold); }
-  .leaflet-popup-content{ margin:12px 16px; min-width:180px; }
-  .leaflet-popup-close-button{ color:#777 !important; }
+  .leaflet-popup-content{ margin:0; width:240px !important; }
+  .leaflet-popup-close-button{ color:#fff !important; text-shadow:0 1px 3px #000; z-index:5; }
+  .popup-body{ padding:11px 15px 13px; }
+
+  /* ---- photo gallery in popup (Google-Maps style) ---- */
+  .pgal{ position:relative; width:100%; height:150px; background:#050505; border-radius:10px 10px 0 0; overflow:hidden; }
+  .pgal-img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .pgal-btn{ position:absolute; top:50%; transform:translateY(-50%); width:28px; height:28px; border:none; border-radius:50%;
+    background:rgba(0,0,0,0.55); color:#fff; font-size:16px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.2s; }
+  .pgal-btn:hover{ background:var(--gold); color:#000; }
+  .pgal-prev{ left:8px; } .pgal-next{ right:8px; }
+  .pgal-count{ position:absolute; bottom:8px; right:10px; font-family:'Poppins',sans-serif; font-size:0.66rem; color:#fff;
+    background:rgba(0,0,0,0.6); padding:2px 8px; border-radius:10px; }
+
   .popup-name{ font-size:1.02rem; font-weight:bold; color:var(--gold-bright); margin-bottom:5px; }
   .popup-badge{ display:inline-block; font-size:0.62rem; letter-spacing:1px; text-transform:uppercase; color:#000; background:var(--gold); padding:2px 7px; border-radius:10px; margin-bottom:7px; }
   .popup-row{ font-size:0.8rem; color:#bbb; margin:3px 0; }
@@ -112,8 +124,9 @@
 //  STEP 1: Publish your Google Sheet  (File ▸ Share ▸ Publish to web ▸ CSV)
 //  STEP 2: Paste that link between the quotes below.
 //  Header names matter, not their order. Recognised columns:
-//     name | city | country | lat | lng | built | visited | category | note
+//     name | city | country | lat | lng | built | visited | category | note | photo
 //  To mark a mosque: type "mosque" in the category column (or add a "mosque" column with "yes").
+//  photo column: filename(s) in the img/ folder, e.g.  bukhara1.jpg | bukhara2.jpg  (or full https URLs). Separate multiple with |
 // ============================================================
 const CSV_URL = "https://docs.google.com/spreadsheets/d/13iVEv8UijY5aK8RpRMctAjJX1UBmvOCXI_jL-p2C10Q/gviz/tq?tqx=out:csv&gid=436474453";
 // ============================================================
@@ -133,6 +146,39 @@ const mosqueIcon = L.divIcon({
 const placeIcon = L.divIcon({ className:"", html:`<div class="place-marker"></div>`, iconSize:[14,14], iconAnchor:[7,7], popupAnchor:[0,-8] });
 
 const toast = document.getElementById("toast");
+
+// ---- photo gallery support ----
+// In the sheet, a "photo" column holds one or more images separated by "|".
+// Each value is either a filename in the img/ folder (e.g. bukhara1.jpg) or a full https URL.
+const galleries = {};            // id -> { i, urls }
+function resolvePhoto(v){
+  v = (v||"").trim();
+  if(!v) return "";
+  if(/^https?:\/\//i.test(v)) return v;          // full URL
+  return "img/" + v.replace(/^img\//i, "");       // filename in img/ folder
+}
+function getPhotos(p){
+  return (p.photo || p.photos || p.image || p.images || "")
+    .split(/[|\n]/).map(resolvePhoto).filter(Boolean);
+}
+window.galMove = function(id, dir){
+  const g = galleries[id]; if(!g) return;
+  g.i = (g.i + dir + g.urls.length) % g.urls.length;
+  document.getElementById("gimg_"+id).src = g.urls[g.i];
+  document.getElementById("gcount_"+id).textContent = (g.i+1)+" / "+g.urls.length;
+};
+function galleryHTML(id, urls){
+  if(!urls.length) return "";
+  galleries[id] = { i:0, urls };
+  const multi = urls.length > 1;
+  return `<div class="pgal">
+    <img class="pgal-img" id="gimg_${id}" src="${urls[0]}" alt="" onerror="this.parentNode.style.display='none'">
+    ${multi?`<button class="pgal-btn pgal-prev" onclick="galMove(${id},-1)">‹</button>
+            <button class="pgal-btn pgal-next" onclick="galMove(${id},1)">›</button>
+            <div class="pgal-count" id="gcount_${id}">1 / ${urls.length}</div>`:""}
+  </div>`;
+}
+
 // A row is a mosque if the "mosque" column says yes  OR  the "category" column contains "mosque"
 const isMosque = p =>
   /^(yes|y|true|1|x|✓)$/i.test((p.mosque||"").trim()) ||
@@ -199,7 +245,7 @@ async function load(){
     const places = parseCSV(text);
     if(!places.length) throw new Error("no rows");
 
-    const group=[]; let mosques=0;
+    const group=[]; let mosques=0, gid=0;
     places.forEach(p=>{
       const lat=parseFloat(p.lat), lng=parseFloat(p.lng);
       if(isNaN(lat)||isNaN(lng)) return;
@@ -207,15 +253,19 @@ async function load(){
       if(mosque) mosques++;
       const m=L.marker([lat,lng],{ icon: mosque?mosqueIcon:placeIcon, riseOnHover:true }).addTo(map);
       const loc=[p.city,p.country].filter(Boolean).join(", ");
+      const photos=getPhotos(p);
       m.bindPopup(`
-        ${mosque?'<div class="popup-badge">Mosque</div>':''}
-        <div class="popup-name">${p.name||"Unnamed"}</div>
-        ${loc?`<div class="popup-row">${loc}</div>`:""}
-        ${p.built?`<div class="popup-row">Built: <b>${p.built}</b></div>`:""}
-        ${p.visited?`<div class="popup-row">Visited: <b>${p.visited}</b></div>`:""}
-        ${(p.category && !/mosque/i.test(p.category))?`<div class="popup-row">${p.category}</div>`:""}
-        ${p.note?`<div class="popup-note">${p.note}</div>`:""}
-      `);
+        ${galleryHTML(gid++, photos)}
+        <div class="popup-body">
+          ${mosque?'<div class="popup-badge">Mosque</div>':''}
+          <div class="popup-name">${p.name||"Unnamed"}</div>
+          ${loc?`<div class="popup-row">${loc}</div>`:""}
+          ${p.built?`<div class="popup-row">Built: <b>${p.built}</b></div>`:""}
+          ${p.visited?`<div class="popup-row">Visited: <b>${p.visited}</b></div>`:""}
+          ${(p.category && !/mosque/i.test(p.category))?`<div class="popup-row">${p.category}</div>`:""}
+          ${p.note?`<div class="popup-note">${p.note}</div>`:""}
+        </div>
+      `, { maxWidth:240, minWidth:240 });
       group.push([lat,lng]);
     });
 
