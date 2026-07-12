@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /admin.html
+Disallow: /finance.html
+Disallow: /plans.html
+Disallow: /investments.html
+Disallow: /api/

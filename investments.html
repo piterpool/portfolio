@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
-    <title>Finance</title>
+    <title>Investments</title>
     <link rel="stylesheet" href="style.css">
     <style>
         .finance-wrap { max-width: 720px; margin: 0 auto; padding: 24px; font-family: sans-serif; }
@@ -22,7 +22,7 @@
 
     <div id="dashboard" class="finance-wrap">
         <div class="topbar">
-            <h1>Finance</h1>
+            <h1>Investments</h1>
             <div class="links">
                 <a href="admin.html">&larr; Admin</a>
                 <button class="logout" id="logoutBtn">Log out</button>
@@ -33,7 +33,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
     <script>
-        const DATA_ENDPOINT = '/api/finance-data';
+        const DATA_ENDPOINT = '/api/investments-data';
 
         document.getElementById('logoutBtn').addEventListener('click', async () => {
             await fetch('/api/auth/logout', { method: 'POST' });
@@ -81,15 +81,15 @@
             dataArea.innerHTML = '';
 
             if (!rows.length) {
-                dataArea.innerHTML = '<p class="empty-note">No rows found in the sheet yet.</p>';
+                dataArea.innerHTML = '<p class="empty-note">No rows found in the sheet yet. Add an "Investments" tab to your Google Sheet.</p>';
                 return;
             }
 
             const headers = Object.keys(rows[0]);
             const dateCol = findColumn(headers, ['date', 'month', 'period']);
             const numericCols = headers.filter((h) => h !== dateCol && rows.some((r) => !isNaN(parseFloat(String(r[h]).replace(/[^0-9.\-]/g, '')))));
-            const categoryCol = findColumn(headers, ['category', 'type']);
-            const amountCol = findColumn(headers, ['amount', 'value', 'total']);
+            const categoryCol = findColumn(headers, ['category', 'type', 'ticker', 'asset']);
+            const amountCol = findColumn(headers, ['amount', 'value', 'total', 'marketvalue']);
 
             // Trend line chart
             if (dateCol && numericCols.length) {
@@ -113,7 +113,7 @@
                 });
             }
 
-            // Category breakdown pie chart
+            // Allocation breakdown pie chart
             if (categoryCol && amountCol) {
                 const totals = {};
                 rows.forEach((r) => {

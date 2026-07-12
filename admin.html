@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Admin</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .admin-wrap { max-width: 480px; margin: 0 auto; padding: 24px; font-family: sans-serif; }
+        .lock-card { margin: 90px auto; padding: 32px; text-align: center; }
+        .lock-card input[type="password"] { width: 100%; padding: 10px; margin: 14px 0; box-sizing: border-box; }
+        .lock-card button { padding: 10px 22px; cursor: pointer; }
+        .lock-msg { min-height: 20px; margin-top: 12px; color: #b00020; font-size: 14px; }
+        #menu { display: none; margin-top: 60px; }
+        #menu .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        #menu button.logout { padding: 6px 14px; cursor: pointer; }
+        .menu-list { list-style: none; padding: 0; margin: 0; }
+        .menu-list li { margin-bottom: 12px; }
+        .menu-list a {
+            display: block; padding: 16px 18px; border: 1px solid #ddd; border-radius: 8px;
+            text-decoration: none; color: inherit; font-size: 16px; font-weight: 600;
+        }
+        .menu-list a:hover { background: #f5f5f5; }
+        .menu-list a span.desc { display: block; font-weight: 400; font-size: 13px; color: #777; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+    <div id="lockScreen" class="admin-wrap lock-card">
+        <h1>Admin</h1>
+        <p>Enter your password to continue.</p>
+        <form id="loginForm">
+            <input id="passwordInput" type="password" placeholder="Password" autocomplete="current-password" required>
+            <br>
+            <button type="submit" id="unlockBtn">Unlock</button>
+        </form>
+        <div id="lockMsg" class="lock-msg"></div>
+    </div>
+
+    <div id="menu" class="admin-wrap">
+        <div class="topbar">
+            <h1>Admin</h1>
+            <button class="logout" id="logoutBtn">Log out</button>
+        </div>
+        <ul class="menu-list">
+            <li><a href="finance.html">Finance<span class="desc">Net worth, spending, trends</span></a></li>
+            <li><a href="plans.html">Plans<span class="desc">Goals and roadmap</span></a></li>
+            <li><a href="investments.html">Investments<span class="desc">Portfolio and positions</span></a></li>
+        </ul>
+    </div>
+
+    <script>
+        const lockScreen = document.getElementById('lockScreen');
+        const menu = document.getElementById('menu');
+        const lockMsg = document.getElementById('lockMsg');
+        const unlockBtn = document.getElementById('unlockBtn');
+
+        function showMenu() {
+            lockScreen.style.display = 'none';
+            menu.style.display = 'block';
+        }
+
+        function showLock() {
+            menu.style.display = 'none';
+            lockScreen.style.display = 'block';
+        }
+
+        // If there's already a valid session (unlocked earlier, within the
+        // 30-minute window), skip straight to the menu.
+        (async () => {
+            try {
+                const res = await fetch('/api/auth/session');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.ok) { showMenu(); return; }
+                }
+            } catch {}
+            showLock();
+        })();
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            lockMsg.textContent = '';
+            const password = document.getElementById('passwordInput').value;
+            unlockBtn.disabled = true;
+            try {
+                const res = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password }),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Login failed.');
+                showMenu();
+            } catch (err) {
+                lockMsg.textContent = err.message || String(err);
+            } finally {
+                unlockBtn.disabled = false;
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            document.getElementById('passwordInput').value = '';
+            showLock();
+        });
+    </script>
+</body>
+</html>
